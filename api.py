@@ -8,6 +8,21 @@ from datetime import timedelta
 from flask import current_app
 from functools import update_wrapper
 
+import logging
+from logging.handlers import RotatingFileHandler
+file_handler = RotatingFileHandler('logs/SSRecommendationAPI.log', 'a', 1 * 1024 * 1024, 20)
+file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
+app.logger.setLevel(logging.INFO)
+file_handler.setLevel(logging.INFO)
+app.logger.addHandler(file_handler)
+app.logger.info('SS Recommendation API startup')
+
+
+
+
+
+
+
 def crossdomain(origin=None, methods=None, headers=None,
                 max_age=21600, attach_to_all=True,
                 automatic_options=True):
@@ -54,7 +69,8 @@ def process_request(request):
     keys = request.args.keys()
     for k in keys:
         query[k] = request.args.get(k)
-    print 'processed request to query: ', query
+    msg = 'processed request to query: '+ str(query)
+    app.logger.info(msg)
     return query 
 
 def process_query_string(query_string):
@@ -63,14 +79,16 @@ def process_query_string(query_string):
     for i in toks:
         kv = i.split('=')
         query[kv[0]] = kv[1]
-    print 'processed query_string to query', query
+    msg = 'processed query_string to query' + str(query)
+    app.logger.info(msg)
     return query 
 
 def check_valid_query(query):
     # check that all parameters are in valid key sets
     valid_keys = set(['uid','cat','likes','dislikes','limit'])
     if set(query.keys()).difference(valid_keys):
-        print 'keys not in valid sets: ', set(query.keys()).difference(valid_keys)
+        msg = 'keys not in valid sets: ' + ','.join(set(query.keys()).difference(valid_keys))
+        app.logger.info(msg)
         abort(400)
     # check that uid and cat are present
     if 'cat' not in query or 'uid' not in query:
@@ -129,9 +147,9 @@ def get_item_sim(query, n):
     #apiurl='http://sugarqapio01.sugarops.com:8000')
     client = predictionio.Client("3lGQW7bsXs3EdhY8tTCJxpKOIlQIzH7JyDx7LQbpJCzfG8fHZxEIdwnolpySrtI0",apiurl='http://ec2-23-22-235-230.compute-1.amazonaws.com:8000')
     recommendations = []
-    deficit = 0
+    msg = 'itemSim query: ' + ','.join(query['likes'])
+    app.logger.info(msg)
     for idx,i in enumerate(query['likes']):
-        print query
         try:
             if query['cat'] == '109':
                 rec =  client.get_itemsim_topn("women-shoes",\
@@ -145,17 +163,18 @@ def get_item_sim(query, n):
             rec = []
         if rec:
             recommendations = recommendations + rec['pio_iids']
-        deficit = idx + 1 - len(recommendations)
     recommendations_norepeat = set(recommendations).difference(set(r.smembers("SS:Recommendations:UID:" + query['uid'])))
+    app.logger.info('n is ' + str(n) + ' rec_norepeat is ' + str(len(recommendations_norepeat)) )
     if len(recommendations_norepeat) > n:
         recommendations_norepeat = random.sample(recommendations_norepeat,n)
-    return recommendations
+    return recommendations_norepeat
 
 def get_random(query, n):
     r = redis.StrictRedis(host = "localhost")
     if n == 0:
         return []
-    print 'hit random'
+    msg = 'hit random'
+    app.logger.info(msg)
     r = redis.StrictRedis(host = "localhost")
     if query['cat'] not in ('109', '219'):
         query['cat'] = '109'
@@ -197,12 +216,16 @@ def get_random(query, n):
 #     return recommendations
 
 def is_new_visitor(query):
-    print 'check user'
+    msg = 'check user'
+    app.logger.info(msg)
     UID = query['uid']    
     r = redis.StrictRedis(host = "localhost")
+    msg = 'redis uid key is ' + "SS:Recommendations:UID:"+UID
+    app.logger.info(msg)
     if "SS:Recommendations:UID:"+UID not in r.keys():
         flag = 1
-        print 'brand new'
+        msg = 'brand new'
+        app.logger.info(msg)
         # quiz = [35554451, 289569549, 381653074, 251492272, 277627106, 381653074\
         # , 364057509, 14286641, 362024011, 363709083, 372945408, 343527540, \
         # 289954679, 361265129, 327482514, 351551809, 262960565, 287513377, \
@@ -213,7 +236,8 @@ def is_new_visitor(query):
         return flag, quiz
     else:
         flag = 0
-        print 'seen ya'
+        msg = 'seen ya'
+        app.logger.info(msg)
         return 0, []
 
 # shown = r.hget('SS:Recommendations', UID)
@@ -229,9 +253,6 @@ def is_new_visitor(query):
 # else:
 #     recommendations = []
     
-@app.route('/recommendation/msg', methods = ['GET','POST'])
-def show_msg(msg='init'):
-    return msg
 
 @app.route('/recommendation/api/v1.0/products', methods = ['GET','POST'])
 def get_recommendation(query_string=[]):
@@ -245,12 +266,14 @@ def get_recommendation(query_string=[]):
         internal = 0
     query = check_valid_query(query)
     query = set_limit(query)
-    print 'query received: ', query
+    msg = 'query received: ' + str(query)
+    app.logger.info(msg)
 
     is_new, recommendations = is_new_visitor(query)
 
     if is_new:
-        print 'new user, giving quiz'
+        msg = 'new user, giving quiz'
+        app.logger.info(msg)
         pass
     elif valid_subsequent_calls(query):
         nLikes = len(query['likes'])
@@ -259,30 +282,34 @@ def get_recommendation(query_string=[]):
         if nLikes > 0 and nLikes/float(nAll) < 0.7:
             nLikes = int(round( nAll * 0.7))
             nDislikes = int(nAll - nLikes)
-        print 'return user, provide recs based on inferred limit'
+        msg = 'return user, provide recs based on inferred limit'
+        app.logger.info(msg)
         rec_likes = get_item_sim(query, nLikes)
-        print 'get recs for ' , nLikes, ' likes', rec_likes
+        msg =  'get recs for ' + str(nLikes) + ' likes: ' + ','.join(rec_likes)
+        app.logger.info(msg)
         rec_dislikes = get_random(query, nDislikes)
-        #rec_dislikes = get_random_rank(query, len(query['dislikes']))
-        print 'get recs for '  , nDislikes, ' dislikes', rec_dislikes
+        msg = 'get recs for '  + str(nDislikes) + ' dislikes: ' + ','.join(rec_dislikes)
+        app.logger.info(msg)
         recommendations = rec_likes + rec_dislikes # override the empty recs
     else: 
-        print 'query not initial or subsequent, show random then'
+        msg = 'query not initial or subsequent, show random then'
+        app.logger.info(msg)
         recommendations = []
 
-    print 'current recommendations', recommendations
+    msg = 'current recommendations: ' + ','.join(recommendations)
+    app.logger.info(msg)
 
     # fall back recommendations:
     short = query['limit'] - len(recommendations)
     while short > 0: 
-        print 'recommendations are ', short , ' short. get random recs'
-       # rec = get_random_rank(query, short+5)
+        msg = 'recommendations are ' + str(short) + ' short. get random recs'
+        app.logger.info(msg)
         rec = get_random(query, short)
-        print recommendations
         recommendations = recommendations + rec
         short = query['limit'] - len(recommendations)
     if short < 0:
-        print 'rec is', -1*short, 'more than needed. trim down'
+        msg = 'rec is ' + str(-1*short) + ' more than needed. trim down'
+        app.logger.info(msg)
         recommendations = recommendations[:short]
 
     for rec in recommendations:
@@ -290,7 +317,7 @@ def get_recommendation(query_string=[]):
         if is_new:
             r.expire("SS:Recommendations:UID:"+ query['uid'], 15*60) # expires in 15 minutes
 
-    show_msg('test')
+    #show_msg('test')
 
     # registere the recommendation before returning response
     if internal:
