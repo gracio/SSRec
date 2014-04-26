@@ -135,10 +135,10 @@ def get_item_sim(query, n):
         try:
             if query['cat'] == '109':
                 rec =  client.get_itemsim_topn("women-shoes",\
-            i , 1+deficit , {"pio_itypes":("cat109",)})   
+            i , 50 , {"pio_itypes":("cat109",)})   
             elif query['cat'] == '219':
                 rec =  client.get_itemsim_topn("men-shoes",\
-            i , 1+defiicit , {"pio_itypes":("cat219",)})   
+            i , 50 , {"pio_itypes":("cat219",)})   
             else:
                 rec = []
         except:
@@ -149,8 +149,6 @@ def get_item_sim(query, n):
     recommendations_norepeat = set(recommendations).difference(set(r.smembers("SS:Recommendations:UID:" + query['uid'])))
     if len(recommendations_norepeat) > n:
         recommendations_norepeat = random.sample(recommendations_norepeat,n)
-    elif len(recommendations) > n:
-        recommendations = recommendations_norepeat + random.sample(recommendations,n-len(recommendations_norepeat))
     return recommendations
 
 def get_random(query, n):
