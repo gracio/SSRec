@@ -163,10 +163,13 @@ def get_item_sim(query, n):
             rec = []
         if rec:
             recommendations = recommendations + rec['pio_iids']
-    recommendations_norepeat = set(recommendations).difference(set(r.smembers("SS:Recommendations:UID:" + query['uid'])))
+    if recommendations:
+        recommendations_norepeat = set(recommendations).difference(set(r.smembers("SS:Recommendations:UID:" + query['uid'])))
+        if len(recommendations_norepeat) > n:
+            recommendations_norepeat = random.sample(recommendations_norepeat,n)
+    else:
+        recommendations_norepeat = []
     app.logger.info('n is ' + str(n) + ' rec_norepeat is ' + str(len(recommendations_norepeat)) )
-    if len(recommendations_norepeat) > n:
-        recommendations_norepeat = random.sample(recommendations_norepeat,n)
     return recommendations_norepeat
 
 def get_random(query, n):
