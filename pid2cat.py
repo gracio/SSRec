@@ -1,7 +1,5 @@
-import pymysql 
-
 def levelNcategory(category_node_id,levelN):
-
+    import pymysql 
     conn = pymysql.connect(host='127.0.0.1', port=3306, user='shopstyle_view', passwd='born2run', db='shopstyle_prod')  
     cur = conn.cursor(pymysql.cursors.DictCursor)
     ownName = 'na'
@@ -34,9 +32,8 @@ def tanimoto(list1, list2):
 	set2 = set([i.lower() for i in list2])
 	return len(set1.intersection(set2))/float(len(set1.union(set2)))
 
-
 def pid2cat(PID, levelN = -1):
-
+	import pymysql
 	PID = str(PID)
 	# grab tags for PID
 	# first hard match against men, women, others
@@ -67,7 +64,7 @@ def pid2cat(PID, levelN = -1):
 			depth.append(j['depth'])
 		if not tag or not identifier or not category_node_id:
 			exit_flag = '! no tags, identifier, or category_node_id available'
-			print 'exit_flag:', exit_flag
+			#print 'exit_flag:', exit_flag
 			cur.close()
 			if levelN < 0:
 				return PID, None,None,None,None,None, None, None, None, None, None, exit_flag
@@ -79,7 +76,7 @@ def pid2cat(PID, levelN = -1):
 			score.append(tanimoto(tag_set, j.split()))
 		if max(score) > 0:
 			matches_id = [idx for idx, i in enumerate(score) if i == max(score) and parent_id[idx]]
-			print matches_id, parent_id[idx]
+			#print matches_id, parent_id[idx]
 			if matches_id:
 				match_id = matches_id[0]
 				cat = category_node_id[match_id]
@@ -116,7 +113,7 @@ def pid2cat(PID, levelN = -1):
 		tags = '-'.join(tag_set)
 	else:
 		exit_flag = '! unavailable from database'
-		print 'exit_flag:', exit_flag
+		#print 'exit_flag:', exit_flag
 		cur.close()
 		if levelN < 0:
 			return PID, None,None,None,None,None, None, None, None, None, None, exit_flag
