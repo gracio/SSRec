@@ -156,20 +156,20 @@ def get_dislikes_rec(query, n):
 
 def get_recs_from_pq(query):
     r = redis.StrictRedis(host = "localhost")
-    pq_key = "SS:Recommendations:UID:"+query['uid']+":prefs"
-    if not [i for i in r.keys() if i.startswith('SS:Recommendations:UID:' + query['uid'] + ':prefs')]:
+    pq_key = "SS:Recommendations:UID:"+query['uid']+":prefs:cat" + query['cat']
+    if not [i for i in r.keys() if i.startswith('SS:Recommendations:UID:' + query['uid'] + ':prefs:cat' + query['cat'])]:
         rec_brandcat = quick_match(query)
         app.logger.info('return quick match to ' + ','.join(query['likes']))
     else:
         # get 30% from likes, 70% from like_sim
-        nLikes2sample = max(int(round(len(query['likes'])*0.3)),1)
+        nLikes2sample = int(len(query['likes'])*0.1)
         nLikes_sim2sample = len(query['likes']) - nLikes2sample 
         rec_likes = []
         rec_likes_sim = []
         if nLikes2sample > 0:
             rec_likes = list( r.srandmember(pq_key+":likes",nLikes2sample))
         if nLikes_sim2sample > 0:
-            rec_likes_sim = list( r.srandmember(pq_key+":likes_sim",nLikes_sim2sample))
+            rec_likes_sim = list(r.srandmember(pq_key+":likes_sim",nLikes_sim2sample))
         rec_brandcat = rec_likes + rec_likes_sim
         print rec_brandcat
         app.logger.info('get ' + str(len(rec_brandcat)) + ' rec_brandcat using ' + str(nLikes2sample) + ' from likes bucket and ' + str(nLikes_sim2sample) + ' from likes_sim bucket')
@@ -193,10 +193,8 @@ def brandcat_list2pid_list(rec_brandcat,query, n):
                 pids = pids + tp
                 offset = offset + 25 # add 25 not length of tp because tp is filtered
                 print i, len(pids)
-            rec_pid = rec_pid + random.sample(pids,1)
-    app.logger.info('sample ' + str(n) + ' from ' + str(len(rec_pid)) + ' rec_pid')
-    if len(rec_pid) > n:
-        rec_pid = random.sample(rec_pid,n)
+            if pids:
+                rec_pid = rec_pid + random.sample(pids,1)
     return rec_pid
 
 def brandcat2pid(brandcat, n, offset):
@@ -257,7 +255,7 @@ def get_random(query, n):
 
 @async
 def deposit_user_prefs(query):
-    pq_key = "SS:Recommendations:UID:"+query['uid']+":prefs"
+    pq_key = "SS:Recommendations:UID:"+query['uid']+":prefs:cat" + query['cat']
     r = redis.StrictRedis(host = "localhost")
     if query['likes']:
         for i in query['likes']:
