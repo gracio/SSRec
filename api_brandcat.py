@@ -218,7 +218,7 @@ def is_new_visitor(query):
     r = redis.StrictRedis(host = "localhost")
     msg = 'redis uid key is ' + "SS:Recommendations:UID:"+UID
     app.logger.info(msg)
-    if "SS:Recommendations:UID:"+UID+":shown" not in r.keys():
+    if not [i for i in r.keys() if i.startswith("SS:Recommendations:UID:" + UID + ":prefs:cat" + query['cat'] )]:
         flag = 1
         msg = 'brand new'
         app.logger.info(msg)
@@ -379,4 +379,3 @@ def not_found(error):
 @app.errorhandler(400)
 def not_found(error):
     return make_response(jsonify( { 'error': 'Bad Request. Revise Parameters.' } ), 400)
-
