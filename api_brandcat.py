@@ -240,6 +240,7 @@ def is_new_visitor(query):
         msg = 'brand new'
         app.logger.info(msg)
         quiz = r.hgetall('SS:Recommendations:quiz:cat' + query['cat']).keys()
+        quiz = random.sample(quiz, query['limit'])
         return 1, quiz
     else:
         flag = 0
